@@ -34,9 +34,18 @@ func main() {
 	}
 
 	_, err = db.Exec(`
+			CREATE TABLE IF NOT EXISTS servers (
+				id INTEGER PRIMARY KEY,
+				url TEXT UNIQUE NOT NULL,
+				port INTEGER DEFAULT 25565 NOT NULL
+			);
+
 			CREATE TABLE IF NOT EXISTS player_count (
-				time INTEGER PRIMARY KEY,
-				count INTEGER
+				server_id INTEGER,
+				time INTEGER,
+				count INTEGER NOT NULL,
+				PRIMARY KEY (server_id, time),
+				FOREIGN KEY (server_id) REFERENCES servers(id)
 			);
 		`)
 	if err != nil {
@@ -50,26 +59,37 @@ func main() {
 
 	http.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 
-		data, err := GetRecent(db, time.Hour*-5)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		data_json, err := json.Marshal(data)
-
-		w.WriteHeader(http.StatusOK)
-		getTemplate("index.html").Execute(w, struct {
+		type templateData []struct {
 			Title string
 			Data  string
-		}{
-			"blockgame", base64.StdEncoding.EncodeToString(data_json),
-		})
+		}
+		var data templateData
+
+		for _, v := range GetServers(db) {
+
+			server_data, err := v.GetRecent(db, time.Hour*-5)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+
+			server_data_json, err := json.Marshal(server_data)
+
+			data = append(data, struct {
+				Title string
+				Data  string
+			}{
+				v.Url, base64.StdEncoding.EncodeToString(server_data_json),
+			})
+
+		}
+		w.WriteHeader(http.StatusOK)
+		getTemplate("index.html").Execute(w, data)
 	})
 
 	go func() {
 		for {
-			go func() { PingServer("mc.blockgame.info").Save(db) }()
+			go func() { GetServers(db).PingServers() }()
 			time.Sleep(time.Minute)
 		}
 	}()
