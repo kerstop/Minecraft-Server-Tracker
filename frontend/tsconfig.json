@@ -1,0 +1,7 @@
+{
+  "compilerOption": {
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "sourceMap": true
+  }
+}
