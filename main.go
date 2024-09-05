@@ -1,10 +1,10 @@
 package main
 
 import (
+	"blockgame_ping/servers"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -15,16 +15,9 @@ import (
 )
 
 var db *sql.DB
-var debug bool
 var templates *template.Template
 
 func main() {
-
-	flag.BoolVar(&debug, "debug", false, "enable dynamic loading of html templates")
-	flag.Parse()
-	if debug {
-		fmt.Println("Running in debug mode")
-	}
 
 	var err error
 	db, err = sql.Open("sqlite3", "file:data.sqlite")
@@ -32,6 +25,7 @@ func main() {
 		fmt.Printf("problem opening file: %s\n", err.Error())
 		os.Exit(1)
 	}
+	servers.Settup(db)
 
 	_, err = db.Exec(`
 			CREATE TABLE IF NOT EXISTS servers (
@@ -52,12 +46,13 @@ func main() {
 		fmt.Printf("unable to create table: %s\n", err.Error())
 		os.Exit(1)
 	}
-	http.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
-	http.HandleFunc("GET /static/bundle.js", func(w http.ResponseWriter, r *http.Request) {
+	http.Handle("/servers/", http.StripPrefix("/servers", servers.ServePage()))
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
+	http.HandleFunc("/static/bundle.js", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "frontend/dist/bundle.js")
 	})
 
-	http.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
 		type templateData []struct {
 			Title string
@@ -65,9 +60,9 @@ func main() {
 		}
 		var data templateData
 
-		for _, v := range GetServers(db) {
+		for _, v := range servers.GetServers() {
 
-			server_data, err := v.GetRecent(db, time.Hour*-5)
+			server_data, err := v.GetRecent(time.Hour * -5)
 			if err != nil {
 				fmt.Println(err)
 				return
@@ -84,12 +79,16 @@ func main() {
 
 		}
 		w.WriteHeader(http.StatusOK)
-		getTemplate("index.html").Execute(w, data)
+		t, err := template.ParseGlob("templates/*.html")
+		if err != nil {
+			fmt.Println("Error:", err.Error())
+		}
+		t.ExecuteTemplate(w, "index.html", data)
 	})
 
 	go func() {
 		for {
-			go func() { GetServers(db).PingServers() }()
+			go func() { servers.GetServers().PingServers() }()
 			time.Sleep(time.Minute)
 		}
 	}()
@@ -98,25 +97,25 @@ func main() {
 	http.ListenAndServe("localhost:8080", nil)
 }
 
-func getTemplate(name string) *template.Template {
-	if debug {
-		t, err := template.ParseGlob("templates/*.html")
-		if err != nil {
-			fmt.Println(err.Error())
-			return nil
-		}
-		return t.Lookup(name)
-	}
+// func getTemplate(name string) *template.Template {
+// 	if dynamicTemplates {
+// 		t, err := template.ParseGlob("templates/*.html")
+// 		if err != nil {
+// 			fmt.Println(err.Error())
+// 			return nil
+// 		}
+// 		return t.Lookup(name)
+// 	}
 
-	if templates == nil {
+// 	if templates == nil {
 
-		t, err := template.ParseGlob("templates/*.html")
-		if err != nil {
-			fmt.Println(err.Error())
-			os.Exit(1)
-		}
-		templates = t
-	}
+// 		t, err := template.ParseGlob("templates/*.html")
+// 		if err != nil {
+// 			fmt.Println(err.Error())
+// 			os.Exit(1)
+// 		}
+// 		templates = t
+// 	}
 
-	return templates.Lookup(name)
-}
+// 	return templates.Lookup(name)
+// }

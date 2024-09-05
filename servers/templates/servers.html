@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MC Server Status</title>
+    <link rel="stylesheet" href="/static/index.css" />
+    <script
+      src="https://unpkg.com/htmx.org@2.0.2"
+      integrity="sha384-Y7hw+L/jvKeWIRRkqWYfPcvVxHzVzn5REgzbawhxAuQGwX1XWe70vji+VSeHOThJ"
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body>
+    <header>
+      <a href="/">Home</a>
+      <a href="/servers" class="selected">Manage Servers</a>
+    </header>
+    <div>
+      <table class="content">
+        <thead>
+          <tr>
+            <th scope="col">URL</th>
+            <th scope="col">Port</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .}} {{template "servers-tr.html" .}} {{end}}
+        </tbody>
+      </table>
+    </div>
+  </body>
+</html>
