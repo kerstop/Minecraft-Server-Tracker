@@ -17,17 +17,31 @@
       <a href="/servers" class="selected">Manage Servers</a>
     </header>
     <div>
-      <table class="content">
-        <thead>
-          <tr>
-            <th scope="col">URL</th>
-            <th scope="col">Port</th>
-          </tr>
-        </thead>
-        <tbody>
-          {{range .}} {{template "servers-tr.html" .}} {{end}}
-        </tbody>
-      </table>
+      <div class="content">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">URL</th>
+              <th scope="col">Port</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{range .}} {{template "servers-tr.html" .}} {{end}}
+          </tbody>
+        </table>
+        <form hx-post="/servers/">
+          <label>Add Server</label>
+          <label>
+            URL
+            <input name="url" value="" />
+          </label>
+          <label>
+            Port
+            <input value="25565" name="port" />
+          </label>
+          <input type="submit" value="Add" />
+        </form>
+      </div>
     </div>
   </body>
 </html>

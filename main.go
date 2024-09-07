@@ -39,7 +39,7 @@ func main() {
 				time INTEGER,
 				count INTEGER NOT NULL,
 				PRIMARY KEY (server_id, time),
-				FOREIGN KEY (server_id) REFERENCES servers(id)
+				FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
 			);
 		`)
 	if err != nil {
@@ -60,7 +60,14 @@ func main() {
 		}
 		var data templateData
 
-		for _, v := range servers.GetServers() {
+		serverList, err := servers.GetServers()
+		if err != nil {
+			println("Failed to read servers:", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		for _, v := range serverList {
 
 			server_data, err := v.GetRecent(time.Hour * -5)
 			if err != nil {
@@ -88,7 +95,15 @@ func main() {
 
 	go func() {
 		for {
-			go func() { servers.GetServers().PingServers() }()
+			go func() {
+				servers, err := servers.GetServers()
+				if err != nil {
+					println("Failed to read servers:", err.Error())
+					return
+				}
+
+				servers.PingServers()
+			}()
 			time.Sleep(time.Minute)
 		}
 	}()

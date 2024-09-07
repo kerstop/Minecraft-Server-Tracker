@@ -8,8 +8,8 @@
   </head>
   <body>
     <header>
-      <button href="/" class="selected">Home</button>
-      <button href="/servers">Manage Servers</button>
+      <a href="/" class="selected">Home</a>
+      <a href="/servers">Manage Servers</a>
     </header>
     <div>
       {{range .}} {{template "chart.html" .}} {{end}}

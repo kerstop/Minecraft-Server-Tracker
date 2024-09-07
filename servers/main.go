@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"strings"
+	"strconv"
 	"time"
 
 	"github.com/mcstatus-io/mcutil/v4/status"
@@ -20,24 +20,129 @@ func Settup(_db *sql.DB) {
 
 func ServePage() http.Handler {
 	var mux = http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 
-		var data = GetServers()
+		var serverList, err = GetServers()
+		if err != nil {
+			println("Failed to read servers:", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 
 		t, err := template.ParseGlob("servers/templates/servers*.html")
 		if err != nil {
 			fmt.Println("error:", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 
-		d := new(strings.Builder)
-		t.ExecuteTemplate(d, "servers.html", data)
-		fmt.Println(d)
-
 		w.WriteHeader(http.StatusOK)
-		err = t.ExecuteTemplate(w, "servers.html", data)
+		err = t.ExecuteTemplate(w, "servers.html", serverList)
 		if err != nil {
 			fmt.Println("error:", err.Error())
 		}
+
+	})
+
+	mux.HandleFunc("POST /", func(w http.ResponseWriter, r *http.Request) {
+
+		var url = r.FormValue("url")
+		var port, err = strconv.Atoi(r.FormValue("port"))
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		_, err = CreateServer(url, uint16(port))
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			println("error:", err.Error())
+			return
+		}
+
+		w.Header().Set("HX-Refresh", "true")
+		w.WriteHeader(http.StatusOK)
+	})
+
+	mux.HandleFunc("GET /{id}/edit", func(w http.ResponseWriter, r *http.Request) {
+		var id, err = strconv.Atoi(r.PathValue("id"))
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("invalid id provided"))
+			return
+		}
+
+		t, err := template.ParseGlob("servers/templates/servers*.html")
+		if err != nil {
+			fmt.Println("error:", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		server, err := GetServer(id)
+		if err != nil {
+			fmt.Println("error:", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		t.ExecuteTemplate(w, "servers-tr-edit.html", server)
+
+	})
+
+	mux.HandleFunc("POST /{id}/edit", func(w http.ResponseWriter, r *http.Request) {
+		var id, err = strconv.Atoi(r.PathValue("id"))
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("invalid id provided"))
+			return
+		}
+
+		var url = r.FormValue("url")
+		port, err := strconv.Atoi(r.FormValue("port"))
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("bad port number"))
+			return
+		}
+
+		server, err := GetServer(id)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			println("Error:", err.Error())
+			return
+		}
+
+		server.Url = url
+		server.Port = uint16(port)
+		server.Save()
+
+		t, err := template.ParseGlob("servers/templates/servers*.html")
+		if err != nil {
+			fmt.Println("error:", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		t.ExecuteTemplate(w, "servers-tr.html", server)
+	})
+
+	mux.HandleFunc("DELETE /{id}", func(w http.ResponseWriter, r *http.Request) {
+		var id, err = strconv.Atoi(r.PathValue("id"))
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("invalid id provided"))
+			return
+		}
+
+		server, err := GetServer(id)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			println("Error:", err.Error())
+			return
+		}
+
+		server.Delete()
 
 	})
 	return mux
@@ -49,12 +154,6 @@ type ServerStatus struct {
 	Epoch       int64 `field:"time" json:"time"`
 }
 
-type Server struct {
-	id   int
-	Url  string
-	Port uint16
-}
-
 func (status ServerStatus) Save() error {
 	_, err := db.Exec(`
 			INSERT INTO player_count
@@ -63,36 +162,36 @@ func (status ServerStatus) Save() error {
 	return err
 }
 
-func GetServers() Servers {
-	rows, err := db.Query(`SELECT * FROM servers;`)
-	if err != nil {
-		println("Error:", err.Error())
-	}
-	var servers []Server
-	for rows.Next() {
-		var server Server
-		err = rows.Scan(&server.id, &server.Url, &server.Port)
-		if err != nil {
-			println("Error:", err.Error())
-		}
-		servers = append(servers, server)
-
-	}
-
-	return Servers(servers)
+type Server struct {
+	Id   int
+	Url  string
+	Port uint16
 }
 
-type Servers []Server
-
-// get server stats and save them
-func (servers Servers) PingServers() {
-	var err error
-	for _, server := range servers {
-		err = server.Ping().Save()
-		if err != nil {
-			fmt.Println("Error:", err.Error())
-		}
+func GetServer(id int) (Server, error) {
+	row := db.QueryRow(`SELECT * FROM servers WHERE id = ?;`, id)
+	server := Server{}
+	err := row.Scan(&server.Id, &server.Url, &server.Port)
+	if err != nil {
+		return Server{}, err
 	}
+
+	return server, nil
+}
+
+func CreateServer(url string, port uint16) (Server, error) {
+	row := db.QueryRow(`INSERT INTO servers (url, port) VALUES (?, ?) RETURNING *;`, url, port)
+	server := Server{}
+	err := row.Scan(&server.Id, &server.Url, &server.Port)
+	if err != nil {
+		return Server{}, err
+	}
+	return server, nil
+}
+
+func (s Server) Save() error {
+	_, err := db.Exec(`UPDATE servers SET url = ?, port = ? WHERE id = ?;`, s.Url, s.Port, s.Id)
+	return err
 }
 
 func (s Server) Ping() ServerStatus {
@@ -115,17 +214,22 @@ func (s Server) Ping() ServerStatus {
 	fmt.Println(players_online, "players on", s.Url)
 
 	return ServerStatus{
-		server_id:   s.id,
+		server_id:   s.Id,
 		PlayerCount: int(players_online),
 		Epoch:       started_at.Unix(),
 	}
+}
+
+func (s Server) Delete() error {
+	_, err := db.Exec(`DELETE FROM servers WHERE id = ?;`, s.Id)
+	return err
 }
 
 // period is how far into the past to look
 func (server Server) GetRecent(period time.Duration) ([]ServerStatus, error) {
 	rows, err := db.Query(`
 		SELECT server_id, count, time FROM player_count WHERE time > ? and server_id = ? ORDER BY time ASC;
-		`, time.Now().Add(period).Unix(), server.id)
+		`, time.Now().Add(period).Unix(), server.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -139,4 +243,36 @@ func (server Server) GetRecent(period time.Duration) ([]ServerStatus, error) {
 
 	return data, nil
 
+}
+
+type ServerList []Server
+
+func GetServers() (ServerList, error) {
+	rows, err := db.Query(`SELECT * FROM servers;`)
+	if err != nil {
+		return nil, err
+	}
+	var servers []Server
+	for rows.Next() {
+		var server Server
+		err = rows.Scan(&server.Id, &server.Url, &server.Port)
+		if err != nil {
+			println("Error:", err.Error())
+		}
+		servers = append(servers, server)
+
+	}
+
+	return ServerList(servers), nil
+}
+
+// get server stats and save them
+func (servers ServerList) PingServers() {
+	var err error
+	for _, server := range servers {
+		err = server.Ping().Save()
+		if err != nil {
+			fmt.Println("Error:", err.Error())
+		}
+	}
 }

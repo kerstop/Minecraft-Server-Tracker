@@ -1,5 +1,9 @@
-<tr>
-  <td>{{.Url}}</td>
-  <td>{{.Port}}</td>
-  <td></td>
+<tr class="editing" hx-target="this" hx-swap="outerHTML">
+  <td><input name="url" value="{{.Url}}" form="server{{.Id}}" /></td>
+  <td><input name="port" value="{{.Port}}" form="server{{.Id}}" /></td>
+  <td>
+    <form id="server{{.Id}}" hx-post="/servers/{{.Id}}/edit">
+      <input type="submit" value="Save" />
+    </form>
+  </td>
 </tr>
