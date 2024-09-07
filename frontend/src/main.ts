@@ -5,16 +5,19 @@ import { enUS } from "date-fns/locale";
 
 type Data = { time: number; count: number }[];
 
-const charts = Array.from(
-  document.getElementsByClassName("chart")
-);
+const chart_containers = Array.from(document.getElementsByClassName("chart"));
 
-for (let chart of charts) {
-  const canvas = <HTMLCanvasElement>Array.from(chart.children).find(e => e.tagName === "CANVAS")
+var charts: { [n: number]: Chart<"line", { x: Date; y: number }[]> } = {};
+const urlParams = new URLSearchParams(window.location.search);
+
+for (let chart_container of chart_containers) {
+  const canvas = <HTMLCanvasElement>(
+    Array.from(chart_container.children).find((e) => e.tagName === "CANVAS")
+  );
   const data: Data = JSON.parse(atob(canvas.getAttribute("data")));
   const current_time = new Date();
 
-  const config: ChartConfiguration<"line", number[], Date> = {
+  const config: ChartConfiguration<"line", { x: Date; y: number }[]> = {
     type: "line",
     options: {
       scales: {
@@ -23,8 +26,11 @@ for (let chart of charts) {
         },
         x: {
           type: "time",
-          max: current_time.valueOf(),
-          min: subHours(current_time, 5).valueOf(),
+          suggestedMax: current_time.valueOf(),
+          min: subHours(
+            current_time,
+            urlParams.has("history") ? Number(urlParams.get("history")) : 5
+          ).valueOf(),
           time: {
             unit: "hour",
           },
@@ -37,14 +43,36 @@ for (let chart of charts) {
       },
     },
     data: {
-      xLabels: data.map((entry) => fromUnixTime(entry.time)),
       datasets: [
         {
           label: "player count",
-          data: data.map((entry) => entry.count),
+          data: data.map((entry) => {
+            return { x: fromUnixTime(entry.time), y: entry.count };
+          }),
         },
       ],
     },
   };
-  new Chart(canvas, config);
+  charts[Number(canvas.getAttribute("server-id"))] = new Chart(canvas, config);
 }
+
+const ws = new WebSocket("/ws");
+
+type ServerStatusUpdate = {
+  server_id: number;
+  time: number;
+  count: number;
+};
+
+ws.addEventListener("message", (msg) => {
+  const updates: ServerStatusUpdate[] = JSON.parse(msg.data);
+
+  for (const update of updates) {
+    const chart = charts[update.server_id];
+    chart.data.datasets[0].data.push({
+      x: fromUnixTime(update.time),
+      y: update.count,
+    });
+    chart.update();
+  }
+});

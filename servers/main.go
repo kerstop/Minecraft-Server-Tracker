@@ -195,8 +195,6 @@ func (s Server) Ping(ctx context.Context) (ServerStatus, error) {
 		players_online = *response.Players.Online
 	}
 
-	fmt.Println(players_online, "players on", s.Url)
-
 	return ServerStatus{
 		ServerID: s.ID,
 		Count:    players_online,
@@ -207,7 +205,8 @@ func (s Server) Ping(ctx context.Context) (ServerStatus, error) {
 type ServerList []Server
 
 // get server stats and save them
-func (servers ServerList) PingServers(ctx context.Context) {
+func (servers ServerList) PingServers(ctx context.Context) []ServerStatus {
+	var update []ServerStatus
 	for _, server := range servers {
 		stat, err := server.Ping(ctx)
 		if err != nil {
@@ -215,9 +214,11 @@ func (servers ServerList) PingServers(ctx context.Context) {
 			continue
 		}
 		err = stat.Save()
-
 		if err != nil {
 			fmt.Println("Error:", err.Error())
 		}
+		update = append(update, stat)
 	}
+	return update
+
 }

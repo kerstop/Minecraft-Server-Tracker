@@ -61,7 +61,7 @@ func (q *Queries) GetServer(ctx context.Context, id int64) (Server, error) {
 }
 
 const getServerStatus = `-- name: GetServerStatus :many
-SELECT server_id, count, time FROM server_status WHERE time > ? and server_id = ? ORDER BY time ASC
+SELECT count, time FROM server_status WHERE time > ? and server_id = ? ORDER BY time ASC
 `
 
 type GetServerStatusParams struct {
@@ -70,9 +70,8 @@ type GetServerStatusParams struct {
 }
 
 type GetServerStatusRow struct {
-	ServerID int64 `json:"server_id"`
-	Count    int64 `json:"count"`
-	Time     int64 `json:"time"`
+	Count int64 `json:"count"`
+	Time  int64 `json:"time"`
 }
 
 func (q *Queries) GetServerStatus(ctx context.Context, arg GetServerStatusParams) ([]GetServerStatusRow, error) {
@@ -84,7 +83,7 @@ func (q *Queries) GetServerStatus(ctx context.Context, arg GetServerStatusParams
 	var items []GetServerStatusRow
 	for rows.Next() {
 		var i GetServerStatusRow
-		if err := rows.Scan(&i.ServerID, &i.Count, &i.Time); err != nil {
+		if err := rows.Scan(&i.Count, &i.Time); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
