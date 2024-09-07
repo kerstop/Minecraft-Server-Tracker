@@ -2,6 +2,7 @@ package main
 
 import (
 	"blockgame_ping/servers"
+	"context"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -54,13 +55,15 @@ func main() {
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
+		ctx := context.Background()
+
 		type templateData []struct {
 			Title string
 			Data  string
 		}
 		var data templateData
 
-		serverList, err := servers.GetServers()
+		serverList, err := servers.Q.GetServers(ctx)
 		if err != nil {
 			println("Failed to read servers:", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -69,7 +72,10 @@ func main() {
 
 		for _, v := range serverList {
 
-			server_data, err := v.GetRecent(time.Hour * -5)
+			server_data, err := servers.Q.GetServerStatus(ctx, servers.GetServerStatusParams{
+				UnixStartTime: time.Now().Add(time.Hour * -5).Unix(),
+				ServerID:      v.ID,
+			})
 			if err != nil {
 				fmt.Println(err)
 				return
@@ -96,13 +102,14 @@ func main() {
 	go func() {
 		for {
 			go func() {
-				servers, err := servers.GetServers()
+				ctx := context.Background()
+				s, err := servers.Q.GetServers(ctx)
 				if err != nil {
 					println("Failed to read servers:", err.Error())
 					return
 				}
 
-				servers.PingServers()
+				servers.ServerList(s).PingServers(ctx)
 			}()
 			time.Sleep(time.Minute)
 		}
@@ -111,26 +118,3 @@ func main() {
 	fmt.Println("Starting HTTP Server")
 	http.ListenAndServe("localhost:8080", nil)
 }
-
-// func getTemplate(name string) *template.Template {
-// 	if dynamicTemplates {
-// 		t, err := template.ParseGlob("templates/*.html")
-// 		if err != nil {
-// 			fmt.Println(err.Error())
-// 			return nil
-// 		}
-// 		return t.Lookup(name)
-// 	}
-
-// 	if templates == nil {
-
-// 		t, err := template.ParseGlob("templates/*.html")
-// 		if err != nil {
-// 			fmt.Println(err.Error())
-// 			os.Exit(1)
-// 		}
-// 		templates = t
-// 	}
-
-// 	return templates.Lookup(name)
-// }
