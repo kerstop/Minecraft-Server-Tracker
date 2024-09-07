@@ -28,25 +28,6 @@ func main() {
 	}
 	servers.Settup(db)
 
-	_, err = db.Exec(`
-			CREATE TABLE IF NOT EXISTS servers (
-				id INTEGER PRIMARY KEY,
-				url TEXT UNIQUE NOT NULL,
-				port INTEGER DEFAULT 25565 NOT NULL
-			);
-
-			CREATE TABLE IF NOT EXISTS player_count (
-				server_id INTEGER,
-				time INTEGER,
-				count INTEGER NOT NULL,
-				PRIMARY KEY (server_id, time),
-				FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
-			);
-		`)
-	if err != nil {
-		fmt.Printf("unable to create table: %s\n", err.Error())
-		os.Exit(1)
-	}
 	http.Handle("/servers/", http.StripPrefix("/servers", servers.ServePage()))
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 	http.HandleFunc("/static/bundle.js", func(w http.ResponseWriter, r *http.Request) {

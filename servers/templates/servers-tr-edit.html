@@ -1,8 +1,8 @@
 <tr class="editing" hx-target="this" hx-swap="outerHTML">
-  <td><input name="url" value="{{.Url}}" form="server{{.Id}}" /></td>
-  <td><input name="port" value="{{.Port}}" form="server{{.Id}}" /></td>
+  <td><input name="url" value="{{.Url}}" form="server{{.ID}}" /></td>
+  <td><input name="port" value="{{.Port}}" form="server{{.ID}}" /></td>
   <td>
-    <form id="server{{.Id}}" hx-post="/servers/{{.Id}}/edit">
+    <form id="server{{.ID}}" hx-post="/servers/{{.ID}}/edit">
       <input type="submit" value="Save" />
     </form>
   </td>

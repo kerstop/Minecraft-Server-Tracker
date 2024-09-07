@@ -179,7 +179,7 @@ func (status ServerStatus) Save() error {
 	})
 }
 
-func (s Server) Ping(ctx context.Context) ServerStatus {
+func (s Server) Ping(ctx context.Context) (ServerStatus, error) {
 
 	started_at := time.Now()
 
@@ -190,8 +190,7 @@ func (s Server) Ping(ctx context.Context) ServerStatus {
 
 	response, err := status.Modern(ctx, s.Url, uint16(s.Port))
 	if err != nil {
-		fmt.Printf("Error: [%s] at time %s\n", err.Error(), started_at.Format(time.Stamp))
-		players_online = 0
+		return ServerStatus{}, err
 	} else {
 		players_online = *response.Players.Online
 	}
@@ -202,16 +201,21 @@ func (s Server) Ping(ctx context.Context) ServerStatus {
 		ServerID: s.ID,
 		Count:    players_online,
 		Time:     started_at.Unix(),
-	}
+	}, nil
 }
 
 type ServerList []Server
 
 // get server stats and save them
 func (servers ServerList) PingServers(ctx context.Context) {
-	var err error
 	for _, server := range servers {
-		err = server.Ping(ctx).Save()
+		stat, err := server.Ping(ctx)
+		if err != nil {
+			fmt.Println("Error:", err.Error())
+			continue
+		}
+		err = stat.Save()
+
 		if err != nil {
 			fmt.Println("Error:", err.Error())
 		}
