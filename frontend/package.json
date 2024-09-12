@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
+    "@rollup/plugin-node-resolve": "^15.2.3",
     "@rollup/plugin-typescript": "^11.1.6",
     "@types/node": "^22.5.1",
     "@types/webpack": "^5.28.5",

@@ -1,6 +1,6 @@
 import { Chart, ChartConfiguration } from "chart.js/auto";
 import "chartjs-adapter-date-fns";
-import { fromUnixTime, getUnixTime, subHours } from "date-fns";
+import { fromUnixTime, subHours } from "date-fns";
 import { enUS } from "date-fns/locale";
 
 type Data = { time: number; count: number }[];
@@ -9,6 +9,9 @@ const chart_containers = Array.from(document.getElementsByClassName("chart"));
 
 var charts: { [n: number]: Chart<"line", { x: Date; y: number }[]> } = {};
 const urlParams = new URLSearchParams(window.location.search);
+const chart_history_size = urlParams.has("history")
+  ? Number(urlParams.get("history"))
+  : 5;
 
 for (let chart_container of chart_containers) {
   const canvas = <HTMLCanvasElement>(
@@ -27,10 +30,7 @@ for (let chart_container of chart_containers) {
         x: {
           type: "time",
           suggestedMax: current_time.valueOf(),
-          min: subHours(
-            current_time,
-            urlParams.has("history") ? Number(urlParams.get("history")) : 5
-          ).valueOf(),
+          min: subHours(current_time, chart_history_size).valueOf(),
           time: {
             unit: "hour",
           },
@@ -49,6 +49,7 @@ for (let chart_container of chart_containers) {
           data: data.map((entry) => {
             return { x: fromUnixTime(entry.time), y: entry.count };
           }),
+          tension: 0.1,
         },
       ],
     },
@@ -73,6 +74,7 @@ ws.addEventListener("message", (msg) => {
       x: fromUnixTime(update.time),
       y: update.count,
     });
+    chart.options.scales.x.suggestedMin = chart_history_size;
     chart.update();
   }
 });
