@@ -1,7 +1,7 @@
 package main
 
 import (
-	"blockgame_ping/servers"
+	"mc_server_tracker/servers"
 	"context"
 	"database/sql"
 	"encoding/base64"

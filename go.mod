@@ -1,4 +1,4 @@
-module blockgame_ping
+module mc_server_tracker
 
 go 1.23
 
